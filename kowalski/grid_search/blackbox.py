@@ -38,6 +38,7 @@ def save_plot(ax, path):
     ax.figure.savefig(path, dpi=500, bbox_inches='tight')
 
 
+# hard coded for binary classification
 class BlackBoxClassifierSearch:
 
     def __init__(

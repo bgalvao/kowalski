@@ -136,20 +136,20 @@ estimators_collection = {
         'pipeline': pipeline_logreg,
         'param_grid': param_grid_logreg
     },
-    # 'svm': {
-    #     'pipeline': pipeline_svm,
-    #     'param_grid': param_grid_svm
-    # },
-    # 'nn': {
-    #     'pipeline': pipeline_nn,
-    #     'param_grid': param_grid_nn
-    # },
-    # 'gb': {
-    #     'pipeline': pipeline_gb,
-    #     'param_grid': param_grid_gb
-    # },
-    # 'rf': {
-    #     'pipeline': pipeline_rf,
-    #     'param_grid': param_grid_rf
-    # }
+    'svm': {
+        'pipeline': pipeline_svm,
+        'param_grid': param_grid_svm
+    },
+    'nn': {
+        'pipeline': pipeline_nn,
+        'param_grid': param_grid_nn
+    },
+    'gb': {
+        'pipeline': pipeline_gb,
+        'param_grid': param_grid_gb
+    },
+    'rf': {
+        'pipeline': pipeline_rf,
+        'param_grid': param_grid_rf
+    }
 }
