@@ -1,4 +1,5 @@
 from itertools import cycle
+from copy import deepcopy
 
 import numpy as np
 import pandas as pd
@@ -8,7 +9,10 @@ import seaborn as sns
 from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.metrics import roc_auc_score
 
-class BBTargetShufflingAssessment:
+from scipy.stats import norm
+
+
+class TargetShufflingAssessment:
     def __init__(
         self,
         estimator,
@@ -20,7 +24,7 @@ class BBTargetShufflingAssessment:
         splitter=StratifiedShuffleSplit(n_splits=10, test_size=0.2),
     ):
 
-        self.estimator = estimator
+        self.estimator = deepcopy(estimator)
 
         self.x = X
         self.y = Y
@@ -246,71 +250,5 @@ class BBTargetShufflingAssessment:
 
         return ax
 
-
-
-
-def delong_test(y_true, y_proba_a, y_proba_b):
-    # https://biasedml.com/roc-comparison/
-    # all the credit goes to Laksan Nathan. I just plugged code here.
-
-    # Model A (random) vs. "good" model B
-    y_proba_a = np.array([.5, .5, .5, .5, .5, .5, .5, .5, .5, .5])
-    y_proba_b = np.array([.2, .5, .1, .4, .9, .8, .7, .5, .9, .8])
-
-    y_true= np.array([0, 0, 0, 0, 1, 0, 1, 1, 1, 1])
-
-    def group_y_proba_by_label(y_true, y_proba):
-        X = [p for (p, a) in zip(y_proba, y_true) if a]
-        Y = [p for (p, a) in zip(y_proba, y_true) if not a]
-        return X, Y
-
-    X_A, Y_A = group_y_proba_by_label(y_true, y_proba_a)
-    X_B, Y_B = group_y_proba_by_label(y_true, y_proba_b)
-
-
-    def structural_components(X, Y):
-        V10 = [1/len(Y) * sum([kernel(x, y) for y in Y]) for x in X]
-        V01 = [1/len(X) * sum([kernel(x, y) for x in X]) for y in Y]
-        return V10, V01
-
-    V_A10, V_A01 = structural_components(X_A, Y_A)
-    V_B10, V_B01 = structural_components(X_B, Y_B)
-
-    def auc(X, Y):
-        def kernel(X, Y):
-            return .5 if Y==X else int(Y < X)
-        return 1/(len(X)*len(Y)) * sum([kernel(x, y) for x in X for y in Y])
-
-    auc_A = auc(X_A, Y_A)
-    auc_B = auc(X_B, Y_B)
-
-    # Compute entries of covariance matrix S (covar_AB = covar_BA)
-
-    def get_S_entry(V_A, V_B, auc_A, auc_B):
-        return 1/(len(V_A)-1) * sum([(a-auc_A)*(b-auc_B) for a,b in zip(V_A, V_B)])
-
-    var_A = (get_S_entry(V_A10, V_A10, auc_A, auc_A) * 1/len(V_A10)
-            + get_S_entry(V_A01, V_A01, auc_A, auc_A) * 1/len(V_A01))
-    var_B = (get_S_entry(V_B10, V_B10, auc_B, auc_B) * 1/len(V_B10)
-            + get_S_entry(V_B01, V_B01, auc_B, auc_B) * 1/len(V_B01))
-    covar_AB = (get_S_entry(V_A10, V_B10, auc_A, auc_B) * 1/len(V_A10)
-                + get_S_entry(V_A01, V_B01, auc_A, auc_B) * 1/len(V_A01))
-
-    # Two tailed test
-    def z_score(var_A, var_B, covar_AB, auc_A, auc_B):
-        return (auc_A - auc_B)/((var_A + var_B - 2*covar_AB)**(.5))
-    
-    z = z_score(var_A, var_B, covar_AB, auc_A, auc_B)
-    p = st.norm.sf(abs(z))*2
-    return z, p
-
-
-    
-
-    
-
-
-        
-    
 
 

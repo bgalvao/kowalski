@@ -1,5 +1,5 @@
 """
-Copyright Bernardo Galvao 2020 github@bgalvao
+Copyright Bernardo Galvao 2021 github@bgalvao
 email: bernardo.galvao.ml@gmail.com
 """
 
@@ -30,9 +30,10 @@ from sklearn.metrics import confusion_matrix
 
 import mlflow
 
-from scrpts.grid_search.estimator_pipelines import estimators_collection as ec
-from scrpts.grid_search.assessment import BBTargetShufflingAssessment
-from scrpts.utils import *
+from kowalski.grid_search.estimator_pipelines import estimators_collection
+from kowalski.grid_search.assessment import TargetShufflingAssessment
+from kowalski.utils import *
+
 
 def save_plot(ax, path):
     ax.figure.savefig(path, dpi=500, bbox_inches='tight')
@@ -49,7 +50,7 @@ class BlackBoxClassifierSearch:
         cvgen=StratifiedKFold(n_splits=5, shuffle=True),
         fit_criterium='roc_auc',
         pipeline_prepends=None, param_grid_preprends=None,
-        sample_weight_allocator=None
+        grid_search_dict=None
     ):
         """[summary]
 
@@ -59,7 +60,7 @@ class BlackBoxClassifierSearch:
             fit_criterium (str, optional): [description]. Defaults to 'roc_auc'.
             pipeline_prepends ([type], optional): [description]. Defaults to None.
             param_grid_preprends ([type], optional): [description]. Defaults to None.
-            sample_weight_allocator ([type], optional): [description]. Defaults to None.
+            grid_search_dict (dict{str: {...}}): mainly for debugging purposes.
         """
         self.bootstrap_test_gen = bootstrap_test_gen
         self.cvgen = cvgen
@@ -69,7 +70,8 @@ class BlackBoxClassifierSearch:
         self.pipeline_prepends = pipeline_prepends
         self.param_grid_prepends = param_grid_preprends
 
-        self.sample_weight_allocator = sample_weight_allocator
+        self.estimators_collection = estimators_collection if grid_search_dict is None \
+            else grid_search_dict
 
 
     def _register_feature_set(self, x:pd.DataFrame, save_dir):
@@ -142,7 +144,6 @@ class BlackBoxClassifierSearch:
         self._register_feature_set(X, save_dir)
         self.bootstrap_fits_ = {estimator:[] for estimator in self.fits_.keys()}
         
-        mlflow.sklearn.autolog()
 
         for i, (train_idx, _) in tqdm(
             enumerate(self.bootstrap_test_gen.split(X, Y))
@@ -156,10 +157,12 @@ class BlackBoxClassifierSearch:
 
                 cachedir = mkdtemp()
                 bestimator.set_params(memory=cachedir)
-                with mlflow.start_run(run_name=f'{estimator}_bs'):
-                    fit_params = {'estimator__sample_weight': sample_weights[train_idx]}\
-                        if sample_weights is not None else {}
-                    bestimator.fit(x_train, y_train, **fit_params)
+
+                fit_params = {'estimator__sample_weight': sample_weights[train_idx]}\
+                    if sample_weights is not None else {}
+                
+                bestimator.fit(x_train, y_train, **fit_params)
+
                 rmtree(cachedir)
 
                 self.bootstrap_fits_[estimator].append(bestimator)
@@ -268,7 +271,7 @@ class BlackBoxClassifierSearch:
             index=rename_dict_estimator
         )
         if save_dir is not None:
-            result.to_csv(os.path.join(save_dir, 'bootstrap.ci.csv'))
+            result.to_html(os.path.join(save_dir, 'bootstrap.ci.html'))
         return result
 
 
@@ -276,12 +279,7 @@ class BlackBoxClassifierSearch:
         self._register_feature_set(X, save_dir)
         self.fits_ = {}
 
-
-
-        mlflow.sklearn.autolog()
-
-        # please reload
-        for estimator, pp in tqdm(ec.items()):
+        for estimator, pp in tqdm(self.estimators_collection.items()):
 
             pipeline, param_grid = pp['pipeline'], pp['param_grid']
             pipeline, param_grid = self._prepare_pipeline(pipeline, param_grid)
@@ -296,19 +294,15 @@ class BlackBoxClassifierSearch:
                     estimator=pipeline,
                     param_grid=param_grid,
                     cv=self.cvgen if cvgen is None else cvgen,
+                    # cv=self.bootstrap_test_gen,
                     n_jobs=-1,
                     scoring=scorers,
                     refit=self.fit_criterium
                 )
 
-                with mlflow.start_run(run_name=f'{estimator}_gs'):
-                    if sample_weights is None:  # i.e. no sample weights were meant to be passed
-                        self.fits_[estimator] = gs.fit(X, Y)
-                    else:
-
-                        # by this logic, classifiers that dont support this are bypassed
-                        fit_params = {'estimator__sample_weight': sample_weights}
-                        self.fits_[estimator] = gs.fit(X, Y, **fit_params)
+                fit_params = {} if sample_weights is None \
+                    else {'estimator__sample_weight': sample_weights}
+                self.fits_[estimator] = gs.fit(X, Y, **fit_params)
 
             except ValueError as error:
                 if 'Invalid parameter class_weight' in str(error):
@@ -316,8 +310,7 @@ class BlackBoxClassifierSearch:
                         because parameter class_weight is invalid for it.')
                     continue
                 else:
-                    print(error)
-                    raise ValueError
+                    raise error
                 
             except TypeError as error:
                 if "unexpected keyword argument 'sample_weight'" in str(error):
@@ -325,12 +318,13 @@ class BlackBoxClassifierSearch:
                         because argument sample_weight is invalid for it.')
                     continue
                 else:
-                    print(error)
-                    raise TypeError
+                    # https://franklingu.github.io/programming/2016/06/30/properly-reraise-exception-in-python/
+                    raise error
 
             finally:
                 rmtree(cachedir)
 
+        assert len(self.fits_) > 0, 'training of estimators failed...'
         return self
 
 
@@ -353,7 +347,8 @@ class BlackBoxClassifierSearch:
             y_pred = bestimator.predict(test_x)
             y_proba = bestimator.predict_proba(test_x)[:, -1]
 
-            d['Estimator'].append(estimator);
+
+            d['Estimator'].append(estimator)
             d['roc_auc'].append(roc_auc_score(test_y, y_proba))
             d['acc'].append(balanced_accuracy_score(test_y, y_pred))
             d['f1'].append(f1_score(test_y, y_pred))
@@ -374,7 +369,7 @@ class BlackBoxClassifierSearch:
             index=rename_dict_estimator
         )
         if save_dir is not None:
-            result.to_csv(os.path.join(save_dir, 'test.set.scores.csv'))
+            result.to_html(os.path.join(save_dir, 'test.set.scores.html'))
         return result
 
 
@@ -563,9 +558,30 @@ class BlackBoxClassifierSearch:
         # return self.roc_curve_plots_
 
 
+    def plot_confusion_matrix(self, test_x, test_y, save_dir=None):
+        from sklearn.metrics import plot_confusion_matrix
+        sns.set_style('dark')
+        
+        if save_dir is not None:
+            save_dir = os.path.join(save_dir, 'confusion_matrix')
+            os.makedirs(save_dir, exist_ok=True)
+
+        for key, gs in self.fits_.items():
+
+            display = plot_confusion_matrix(gs.best_estimator_, test_x, test_y)
+      
+            if save_dir is not None:
+                display.figure_.savefig(
+                    os.path.join(save_dir, f'cm_{key}.png'),
+                    dpi=500, bbox_inches='tight'
+                )
+
+
     def confusion_matrix_point(
         self,
         estimator_key,
+        test_x,
+        test_y,
         fpr_x=None,
         normalize=False,
         on_intermediate=True
@@ -606,10 +622,12 @@ class BlackBoxClassifierSearch:
         cm = confusion_matrix(test_y, cat_pred)
         
         tn, fp, fn, tp = cm.ravel()
+
+        negative_positive = ('[-]', '[+]')
         cm = pd.DataFrame(
             cm,
-            columns=[f'predicted {l}' for l in ('B', 'M')],
-            index=[f'true {l}' for l in ('B', 'M')]
+            columns=[f'predicted {l}' for l in negative_positive],
+            index=[f'true {l}' for l in negative_positive]
         )
         
         print(f'[TPR] :: {tp/(tp+fn):.2f} »« [FPR] :: {1-tp/(tp+fn):.2f}')
@@ -632,14 +650,14 @@ class BlackBoxClassifierSearch:
             test_x ([type], optional): [description]. Defaults to None.
             test_y ([type], optional): [description]. Defaults to None.
         """
-        self.target_shuffling_assessments_ = {}
+        self.target_shuffling_assessments_bootstrapped_ = {}
 
-        if test_x is not None:
+        if test_x is not None:  # if there is a test set
             assert test_y is not None
-            self.target_shuffling_assessments_bootstrapped_ = {}
+            self.target_shuffling_assessments_ = {}
         
         for estimator, gs in tqdm(self.fits_.items()):
-            tsa = BBTargetShufflingAssessment(
+            tsa = TargetShufflingAssessment(
                 deepcopy(gs.best_estimator_),
                 X=train_x, Y=train_y,
                 external_X=test_x, external_Y=test_y,
@@ -647,10 +665,10 @@ class BlackBoxClassifierSearch:
             )
             tsa.run_trials()
 
-            if test_x is not None:
-                self.target_shuffling_assessments_bootstrapped_[estimator] = tsa
-            else:
+            if test_x is not None:  # if there is a test set
                 self.target_shuffling_assessments_[estimator] = tsa
+            else:
+                self.target_shuffling_assessments_bootstrapped_[estimator] = tsa
         
         return self
 
