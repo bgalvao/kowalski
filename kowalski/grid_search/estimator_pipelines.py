@@ -105,8 +105,6 @@ param_grid_gb = {
 from gplearn.genetic import SymbolicClassifier
 from gplearn.functions import make_function
 
-sq = make_function(lambda x: x**2, 'square', 1)
-
 # https://gplearn.readthedocs.io/en/stable/reference.html#symbolic-classifier
 sc = SymbolicClassifier(
     population_size=2000,
@@ -117,7 +115,7 @@ sc = SymbolicClassifier(
 #     init_method='full',
     init_method='half and half',
     function_set=(
-        'add', 'sub', 'mul', 'div', 'cos', 'log', sq,
+        'add', 'sub', 'mul', 'div', 'cos', 'log'
 #         'sin', 'min', 'max', 'sqrt',  #'neg', 'tan'
     ), 
     transformer='sigmoid',
