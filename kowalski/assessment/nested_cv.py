@@ -94,7 +94,10 @@ class NestedCVTestAssessment():
         assert self.cvgen.n_splits == len(estimators)
 
         for (_, val_idx), estimator in zip(self.cvgen.split(x,y), estimators):
-            x_val, y_val = x.iloc[val_idx], y[val_idx]
+            
+            x_val = x.iloc[val_idx]
+            y_val = y.iloc[val_idx] if type(y) == pd.Series else y[val_idx]
+
             y_proba = estimator.predict_proba(x_val)[:, -1]
             
             roc_curves.append(roc_curve(y_val, y_score=y_proba))
