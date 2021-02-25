@@ -31,10 +31,7 @@ class NestedCV():
     def __init__(
         self, 
         search_estimator:BaseSearchCV,  # this type hint does not make an assertion
-        outer_cv=StratifiedShuffleSplit(
-            n_splits=10, test_size=.2,
-            random_state=np.random.randint(2**32-1)
-        ),
+        outer_cv=StratifiedKFold(n_splits=5)
     ):
         """[summary]
 
