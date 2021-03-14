@@ -50,7 +50,7 @@ coef0s = {"nusvc__coef0": [.0, .5, 1.0]}
 param_grid_svm = [
     # poly kernel
     {
-        **{"nusvc__kernel": ["poly"], "nusvc__degree": [2, 3],},
+        **{"nusvc__kernel": ["poly"], "nusvc__degree": [2],},
         **coef0s,
         **common_params,
         **gammas,
