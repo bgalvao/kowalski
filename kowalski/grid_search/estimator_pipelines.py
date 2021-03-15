@@ -149,5 +149,5 @@ estimators_collection = {
     'mlp': (pipeline_nn, param_grid_nn),
     'gbc': (pipeline_gb, param_grid_gb),
     'rf': (pipeline_rf, param_grid_rf),
-    'gp': (pipeline_gp, param_grid_gp)
+    # 'gp': (pipeline_gp, param_grid_gp)
 }
