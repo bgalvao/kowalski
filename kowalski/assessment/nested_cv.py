@@ -96,21 +96,6 @@ class NestedCV():
         self.diff_to_inner_mean_agg_ = self.differences_.agg(
             [lcb, 'mean', ucb, 'std', wilcoxon_less]
         )
-    
-        #
-
-        # TODO check is fitted, and fit the 'master' if not.
-        # self.roc_curves_, self.test_roc_curve_ = self.__collect_roc_curves(
-        #     x, y,
-        #     test_x, test_y,
-        #     self.search_estimator, self.fits_
-        # )
-
-        # self.delong_z_, self.delong_pval_ = self.__delong_test(
-        #     test_x, test_y,
-        #     self.search_estimator,
-        #     self.fits_
-        # )
 
         return self
 
