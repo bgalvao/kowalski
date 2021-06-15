@@ -50,7 +50,7 @@ coef0s = {"nusvc__coef0": [.0, .5, 1.0]}
 param_grid_svm = [
     # poly kernel
     {
-        **{"nusvc__kernel": ["poly"], "nusvc__degree": [2, 3],},
+        **{"nusvc__kernel": ["poly"], "nusvc__degree": [2],},
         **coef0s,
         **common_params,
         **gammas,
@@ -105,8 +105,6 @@ param_grid_gb = {
 from gplearn.genetic import SymbolicClassifier
 from gplearn.functions import make_function
 
-sq = make_function(lambda x: x**2, 'square', 1)
-
 # https://gplearn.readthedocs.io/en/stable/reference.html#symbolic-classifier
 sc = SymbolicClassifier(
     population_size=2000,
@@ -117,7 +115,7 @@ sc = SymbolicClassifier(
 #     init_method='full',
     init_method='half and half',
     function_set=(
-        'add', 'sub', 'mul', 'div', 'cos', 'log', sq,
+        'add', 'sub', 'mul', 'div', 'cos', 'log'
 #         'sin', 'min', 'max', 'sqrt',  #'neg', 'tan'
     ), 
     transformer='sigmoid',
@@ -151,5 +149,5 @@ estimators_collection = {
     'mlp': (pipeline_nn, param_grid_nn),
     'gbc': (pipeline_gb, param_grid_gb),
     'rf': (pipeline_rf, param_grid_rf),
-    'gp': (pipeline_gp, param_grid_gp)
+    # 'gp': (pipeline_gp, param_grid_gp)
 }
